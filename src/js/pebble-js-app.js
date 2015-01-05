@@ -1,3 +1,5 @@
+var ajax = require('ajax');
+
 // main function to retrieve, format, and send cgm data
 function fetchCgmData() {
   
@@ -11,7 +13,7 @@ function fetchCgmData() {
     opts = JSON.parse(window.localStorage.getItem('cgmPebble'));
 
 	// check if endpoint exists
-    if (!opts.endpoint) {
+    if (!opts.host || !opts.username || !opts.password) {
         // endpoint doesn't exist, return no endpoint to watch
 		// " " (space) shows these are init values, not bad or null values
         message = {
@@ -34,14 +36,77 @@ function fetchCgmData() {
     //console.log("fetchCgmData IN OPTIONS = " + JSON.stringify(opts));
   
     // call XML
+    
     var req = new XMLHttpRequest();
     
     // get cgm data
-    req.open('GET', opts.endpoint, true);
-    
+    req.open('POST', 'https://' + opts.host + '/auth/login', true, opts.username, opts.password);
     req.setRequestHeader('Cache-Control', 'no-cache');
+    req.responseType = 'json';
+    req.onreadystatechange = function(e) {
+	if(req.readyState == 4) {
+	    var message = {
+                icon: " ",
+                bg: " ",
+                tcgm: 0,
+                tapp: 0,
+                dlta: "ERR",
+                ubat: " ",
+                name: " ",
+                vals: " "
+            };
+
+	    if(req.status == 200) {
+		var token = req.getResponseHeader('x-tidepool-session-token');
+		var userid = req.response.userid;
+
+		var query = new XMLHttpRequest();
+		query.open('POST', 'https://' + opts.host + '/query/data', true);
+		query.setRequestHeader('Cache-Control', 'no-cache');
+		query.setRequestHeader('x-tidepool-session-token', token);
+		query.responseType = 'json';
+		query.onreadystatechange = function(e) {
+		    if (query.readyState == 4) {
+			if (query.status == 200 && query.response.length > 0) {
+			    var results = query.response;
+			    var lastResult = results[results.length - 1];
+			    message.bg = '' +  Math.round(lastResult.value * 18.01559);
+			    message.currentIcon = "8";
+
+			    // Get current time object
+			    var appDate = new Date();
+
+			    // set the CGM time of the reading
+			    message.tcgm = Math.floor( 
+				(new Date(lastResult.time).getTime() / 1000) - (appDate.getTimezoneOffset() * 60) 
+			    );
+
+			    // set the time for the App
+			    message.tapp = Math.floor( 
+				(appDate.getTime() / 1000) - (appDate.getTimezoneOffset() * 60) 
+			    );
+
+			    // Figure out the change in BG over the readings
+			    var bgDelta = Math.round((lastResult.value - results[0].value) * 18.01559);
+			    message.bgDelta = ((bgDelta > 0 ? '+' : '') + bgDelta);
+
+			    message.name = "Eric";
+			    // "mmol?,lowBg,highBg,lowSnooze,highSnooze,lowVibe,highVibe,vibePattern,timeFormat"
+			    message.vals = "0,70,150,30,120,2,2,2,1";
+			}
+			MessageQueue.sendAppMessage(message);
+		    }
+		}
+		query.send('METAQUERY WHERE userid IS ' + userid + ' QUERY TYPE IN cbg WHERE time > ' new Date(Date.now() - 35 * 60000).toISOString() + 'SORT BY time AS Timestamp REVERSED');
+	    } else {
+		MessageQueue.sendAppMessage(message);
+	    }
+	}
+    }
+
 	
-    req.onload = function(e) {
+/*
+    req.onreadystatechange = function(e) {
 
         if (req.readyState == 4) {
 
@@ -191,6 +256,7 @@ function fetchCgmData() {
             } // end req.status == 200
         } // end req.readyState == 4
     }; // req.onload
+*/
     req.send(null);
 } // end fetchCgmData
 
@@ -344,9 +410,11 @@ Pebble.addEventListener("appmessage",
                         fetchCgmData();
                         });
 
-Pebble.addEventListener("showConfiguration", function(e) {
-                        console.log("Showing Configuration", JSON.stringify(e));
-                        Pebble.openURL('http://nightscout.github.io/cgm-pebble/s1-config-6.html');
+Pebble.addEventListener("showConfiguration", 
+			function(e) {
+			    console.log("Showing Configuration", JSON.stringify(e));
+			    Pebble.openURL('https://raw.githubusercontent.com/cheddar/cgm-pebble/master/config.html');
+//			    Pebble.openURL('http://nightscout.github.io/cgm-pebble/s1-config-6.html');
                         });
 
 Pebble.addEventListener("webviewclosed", function(e) {
