@@ -44,15 +44,15 @@
 	    }
 	  </script>
 	  <div data-role="fieldcontain">
+	    <label for="host"><strong>Enter Tidepool Host:</strong></label>
+	    <input type="text" name="host" id="host" />
+
 	    <label for="username"><strong>Enter Tidepool Username:</strong></label>
 	    <input type="text" name="username" id="username" />
 
 	    <label for="password"><strong>Enter Tidepool Password:</strong></label>
-	    <input type="password" name="password" id="password" />
+	    <input type="text" name="password" id="password" />
 	  
-	    <label for="host"><strong>Enter Tidepool Host:</strong></label>
-	    <input type="text" name="host" id="host" value="api.tidepool.io"/>
-
 	  <div data-role="fieldcontain">
 	    <label for="t1name">
 	      <strong>Enter T1 Name:</strong>
@@ -233,7 +233,9 @@
 	highbg = 'mmhighbg';
 	}
         var options = {
-	'endpoint': $("#endpoint").val(),
+	'host': $("#host").val(),
+	'username': $("#username").val(),
+	'password': $("#password").val(),
 	't1name' : $("#t1name").val(),
 	'radio' : $('input[name=tipo_cadastro]:checked').val(),
 	'lowbg' : $("#" + lowbg + " option:selected").val(),
